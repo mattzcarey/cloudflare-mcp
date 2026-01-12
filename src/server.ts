@@ -38,17 +38,9 @@ interface OperationInfo {
   summary?: string;
   description?: string;
   tags?: string[];
-  parameters?: Array<{
-    name: string;
-    in: "path" | "query" | "header";
-    required?: boolean;
-    schema?: { type?: string; enum?: string[] };
-    description?: string;
-  }>;
-  requestBody?: {
-    required?: boolean;
-    content?: Record<string, { schema?: unknown }>;
-  };
+  parameters?: Array<{ name: string; in: string; required?: boolean; schema?: unknown; description?: string }>;
+  requestBody?: { required?: boolean; content?: Record<string, { schema?: unknown }> };
+  responses?: Record<string, { description?: string; content?: Record<string, { schema?: unknown }> }>;
 }
 
 interface PathItem {
@@ -76,16 +68,16 @@ export function createServer(env: Env, apiToken: string): McpServer {
   server.registerTool(
     "search",
     {
-      description: `Search the Cloudflare OpenAPI spec by writing JavaScript code. You have access to 'spec.paths' which contains all API endpoints.
+      description: `Search the Cloudflare OpenAPI spec. All $refs are pre-resolved inline.
 
 Products: ${PRODUCTS.slice(0, 30).join(", ")}... (${PRODUCTS.length} total)
 
 Types:
 ${SPEC_TYPES}
 
-Your code must be an async arrow function that returns the search results.
+Examples:
 
-Example - find endpoints by product (product is first tag):
+// Find endpoints by product
 async () => {
   const results = [];
   for (const [path, methods] of Object.entries(spec.paths)) {
@@ -98,9 +90,16 @@ async () => {
   return results;
 }
 
-Example - get endpoint details:
+// Get endpoint with requestBody schema (refs are resolved)
 async () => {
-  return spec.paths['/accounts/{account_id}/workers/scripts'];
+  const op = spec.paths['/accounts/{account_id}/d1/database']?.post;
+  return { summary: op?.summary, requestBody: op?.requestBody };
+}
+
+// Get endpoint parameters
+async () => {
+  const op = spec.paths['/accounts/{account_id}/workers/scripts']?.get;
+  return op?.parameters;
 }`,
       inputSchema: {
         code: z

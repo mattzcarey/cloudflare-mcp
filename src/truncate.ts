@@ -1,5 +1,5 @@
 const CHARS_PER_TOKEN = 4;
-const MAX_TOKENS = 10000;
+const MAX_TOKENS = 6000;
 const MAX_CHARS = MAX_TOKENS * CHARS_PER_TOKEN;
 
 export function truncateResponse(content: unknown): string {

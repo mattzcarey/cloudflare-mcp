@@ -142,9 +142,35 @@ function generateTypes(endpoints: EndpointInfo[], categories: Record<string, num
   return lines.join("\n");
 }
 
+function resolveRefs(obj: unknown, spec: OpenAPIV3.Document, seen = new Set<string>()): unknown {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(item => resolveRefs(item, spec, seen));
+
+  const record = obj as Record<string, unknown>;
+
+  if ('$ref' in record && typeof record.$ref === 'string') {
+    const ref = record.$ref;
+    if (seen.has(ref)) return { $circular: ref };
+    seen.add(ref);
+
+    const parts = ref.replace('#/', '').split('/');
+    let resolved: unknown = spec;
+    for (const part of parts) {
+      resolved = (resolved as Record<string, unknown>)?.[part];
+    }
+    return resolveRefs(resolved, spec, seen);
+  }
+
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    result[key] = resolveRefs(value, spec, seen);
+  }
+  return result;
+}
+
 function generateSpecFile(spec: OpenAPIV3.Document): string {
-  // Extract just the paths with their operations (without huge schema definitions)
-  const paths: Record<string, Record<string, { summary?: string; description?: string; tags?: string[]; parameters?: unknown[]; requestBody?: unknown }>> = {};
+  const paths: Record<string, Record<string, unknown>> = {};
 
   for (const [path, pathItem] of Object.entries(spec.paths || {})) {
     if (!pathItem) continue;
@@ -162,8 +188,9 @@ function generateSpecFile(spec: OpenAPIV3.Document): string {
           summary: op.summary,
           description: op.description,
           tags,
-          parameters: op.parameters,
-          requestBody: op.requestBody,
+          parameters: resolveRefs(op.parameters, spec),
+          requestBody: resolveRefs(op.requestBody, spec),
+          responses: resolveRefs(op.responses, spec),
         };
       }
     }

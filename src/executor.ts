@@ -35,7 +35,7 @@ export default class CodeExecutor extends WorkerEntrypoint {
   async evaluate(apiToken) {
     const cloudflare = {
       async request(options) {
-        const { method, path, query, body } = options;
+        const { method, path, query, body, contentType, rawBody } = options;
 
         const url = new URL(apiBase + path);
         if (query) {
@@ -46,13 +46,27 @@ export default class CodeExecutor extends WorkerEntrypoint {
           }
         }
 
+        const headers = {
+          "Authorization": "Bearer " + apiToken,
+        };
+
+        if (contentType) {
+          headers["Content-Type"] = contentType;
+        } else if (body && !rawBody) {
+          headers["Content-Type"] = "application/json";
+        }
+
+        let requestBody;
+        if (rawBody) {
+          requestBody = body;
+        } else if (body) {
+          requestBody = JSON.stringify(body);
+        }
+
         const response = await fetch(url.toString(), {
           method,
-          headers: {
-            "Authorization": "Bearer " + apiToken,
-            "Content-Type": "application/json",
-          },
-          body: body ? JSON.stringify(body) : undefined,
+          headers,
+          body: requestBody,
         });
 
         const data = await response.json();

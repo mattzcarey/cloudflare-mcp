@@ -69,6 +69,17 @@ export default class CodeExecutor extends WorkerEntrypoint {
           body: requestBody,
         });
 
+        const responseContentType = response.headers.get("content-type") || "";
+
+        // Handle non-JSON responses (e.g., KV values)
+        if (!responseContentType.includes("application/json")) {
+          const text = await response.text();
+          if (!response.ok) {
+            throw new Error("Cloudflare API error: " + response.status + " " + text);
+          }
+          return { success: true, result: text };
+        }
+
         const data = await response.json();
 
         if (!data.success) {

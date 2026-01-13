@@ -10,6 +10,8 @@ interface CloudflareRequestOptions {
   path: string;
   query?: Record<string, string | number | boolean | undefined>;
   body?: unknown;
+  contentType?: string;  // Custom Content-Type header (defaults to application/json if body is present)
+  rawBody?: boolean;     // If true, sends body as-is without JSON.stringify
 }
 
 interface CloudflareResponse<T = unknown> {
@@ -143,6 +145,21 @@ async () => {
     path: \`/accounts/\${accountId}/workers/scripts\`
   });
   return response.result;
+}
+
+// Upload a Worker script (service worker syntax)
+async () => {
+  const workerCode = \`addEventListener('fetch', event => {
+    event.respondWith(new Response('Hello World!'));
+  });\`;
+
+  return await cloudflare.request({
+    method: "PUT",
+    path: \`/accounts/\${accountId}/workers/scripts/my-worker\`,
+    body: workerCode,
+    contentType: "application/javascript",
+    rawBody: true
+  });
 }`,
       inputSchema: {
         code: z.string().describe("JavaScript async arrow function to execute"),

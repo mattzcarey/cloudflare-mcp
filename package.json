@@ -8,8 +8,7 @@
     "deploy": "npm run build:spec && wrangler deploy",
     "types": "wrangler types",
     "typecheck": "npm run types && tsc --noEmit",
-    "build:spec": "tsx scripts/build-spec.ts",
-    "count-tokens": "tsx scripts/count-tokens.ts"
+    "build:spec": "tsx scripts/build-spec.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.8",

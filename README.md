@@ -10,7 +10,7 @@ Uses codemode to avoid dumping too much context to your agent.
 
 ### Create API Token
 
-Create a [Cloudflare API token](https://dash.cloudflare.com/profile/api-tokens) with the permissions you need.
+Create a [Cloudflare API token](https://dash.cloudflare.com/profile/api-tokens) with the permissions you need. If the token only has access to one account, the execute tool will auto-resolve `account_id`; tokens with multiple accounts still need `account_id` passed explicitly.
 
 Both **user tokens** and **account tokens** are supported:
 

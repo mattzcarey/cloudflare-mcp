@@ -4,6 +4,53 @@ import { createCodeExecutor, createSearchExecutor } from "./executor";
 import { truncateResponse } from "./truncate";
 import { PRODUCTS } from "./data/products";
 
+
+async function resolveAccountId(
+  apiBase: string,
+  apiToken: string
+): Promise<string> {
+  const response = await fetch(`${apiBase}/accounts`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${apiToken}`,
+    },
+  });
+
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    const text = await response.text();
+    throw new Error(`Cloudflare API error: ${response.status} ${text}`);
+  }
+
+  const data = await response.json<{
+    success: boolean;
+    result: AccountResult[];
+    errors: Array<{ code: number; message: string }>;
+  }>();
+
+  if (!data.success) {
+    const errors = data.errors.map((e) => `${e.code}: ${e.message}`).join(", ");
+    throw new Error(`Cloudflare API error: ${errors}`);
+  }
+
+  if (!Array.isArray(data.result) || data.result.length === 0) {
+    throw new Error("No Cloudflare accounts found for this token.");
+  }
+
+  if (data.result.length === 1 && data.result[0]?.id) {
+    return data.result[0].id;
+  }
+
+  const accountSummary = data.result
+    .slice(0, 5)
+    .map((account) => `${account.id ?? "unknown"} (${account.name ?? ""})`)
+    .join(", ");
+  throw new Error(
+    `Multiple Cloudflare accounts found. Provide account_id to select one. ` +
+      `Found: ${accountSummary}`
+  );
+}
+
 const CLOUDFLARE_TYPES = `
 interface CloudflareRequestOptions {
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -71,6 +118,7 @@ export function createServer(env: Env, apiToken: string, accountId?: string): Mc
 
   const executeCode = createCodeExecutor(env);
   const executeSearch = createSearchExecutor(env);
+  const apiBase = env.CLOUDFLARE_API_BASE;
 
   server.registerTool(
     "search",
@@ -138,11 +186,11 @@ Your code must be an async arrow function that returns the result.
 
 Example: Worker with bindings (requires multipart/form-data):
 async () => {
-  const code = \`addEventListener('fetch', e => e.respondWith(MY_KV.get('key').then(v => new Response(v || 'none'))));\`;
+  const code = `addEventListener('fetch', e => e.respondWith(MY_KV.get('key').then(v => new Response(v || 'none'))));`;
   const metadata = { body_part: "script", bindings: [{ type: "kv_namespace", name: "MY_KV", namespace_id: "your-kv-id" }] };
-  const b = \`--F\${Date.now()}\`;
-  const body = [\`--\${b}\`, 'Content-Disposition: form-data; name="metadata"', 'Content-Type: application/json', '', JSON.stringify(metadata), \`--\${b}\`, 'Content-Disposition: form-data; name="script"', 'Content-Type: application/javascript', '', code, \`--\${b}--\`].join("\\r\\n");
-  return cloudflare.request({ method: "PUT", path: \`/accounts/\${accountId}/workers/scripts/my-worker\`, body, contentType: \`multipart/form-data; boundary=\${b}\`, rawBody: true });
+  const b = `--F${Date.now()}`;
+  const body = [`--${b}`, 'Content-Disposition: form-data; name="metadata"', 'Content-Type: application/json', '', JSON.stringify(metadata), `--${b}`, 'Content-Disposition: form-data; name="script"', 'Content-Type: application/javascript', '', code, `--${b}--`].join("\r\n");
+  return cloudflare.request({ method: "PUT", path: `/accounts/${accountId}/workers/scripts/my-worker`, body, contentType: `multipart/form-data; boundary=${b}`, rawBody: true });
 }`;
 
   if (accountId) {
@@ -168,19 +216,32 @@ async () => {
       }
     );
   } else {
-    // User token mode: account_id is required
+    // User token mode: account_id can be auto-resolved
     server.registerTool(
       "execute",
       {
         description: executeDescription,
         inputSchema: {
           code: z.string().describe("JavaScript async arrow function to execute"),
-          account_id: z.string().describe("Your Cloudflare account ID (call GET /accounts to list available accounts)"),
+          account_id: z
+            .string()
+            .optional()
+            .describe(
+              "Optional Cloudflare account ID (if omitted, auto-resolves when only one account is available)"
+            ),
         },
       },
       async ({ code, account_id }) => {
         try {
-          const result = await executeCode(code, account_id, apiToken);
+          const resolvedAccountId =
+            account_id ??
+            (apiBase ? await resolveAccountId(apiBase, apiToken) : undefined);
+          if (!resolvedAccountId) {
+            throw new Error(
+              "Cloudflare API base is missing; provide account_id explicitly."
+            );
+          }
+          const result = await executeCode(code, resolvedAccountId, apiToken);
           return { content: [{ type: "text", text: truncateResponse(result) }] };
         } catch (error) {
           return {

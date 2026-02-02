@@ -82,6 +82,16 @@ export default class CodeExecutor extends WorkerEntrypoint {
 
         const data = await response.json();
 
+        // Handle GraphQL responses (different format than REST)
+        if (path === '/graphql' || path.endsWith('/graphql')) {
+          if (data.errors && data.errors.length > 0) {
+            const msgs = data.errors.map(e => e.message).join(", ");
+            throw new Error("GraphQL error: " + msgs);
+          }
+          return { success: true, result: data.data, errors: [], messages: [] };
+        }
+
+        // Handle REST API responses
         if (!data.success) {
           const errors = data.errors.map(e => e.code + ": " + e.message).join(", ");
           throw new Error("Cloudflare API error: " + errors);

@@ -1,3 +1,9 @@
+> [!WARNING]  
+> This repository is a read-only archive and no longer maintained or deployed.
+> It is likely that none of the steps below will work.
+> Please see [cloudflare/mcp](https://github.com/cloudflare/mcp) for the official Cloudflare API MCP Server.
+
+
 # cloudflare-mcp
 
 > A smol MCP server for the complete Cloudflare API.
@@ -20,54 +26,6 @@ Both **user tokens** and **account tokens** are supported:
 | Account Token | Scoped to single account | `account_id` auto-detected, no parameter needed |
 
 For account tokens, include the **Account Resources : Read** permission so the server can auto-detect your account ID.
-
-### Add to Agent
-
-MCP URL: `https://cloudflare-mcp.mattzcarey.workers.dev/mcp`
-Bearer Token: Your [Cloudflare API Token](https://dash.cloudflare.com/profile/api-tokens)
-
-#### Claude Code
-
-<details>
-<summary>CLI</summary>
-
-```bash
-export CLOUDFLARE_API_TOKEN="your-token-here"
-
-claude mcp add --transport http cloudflare-api https://cloudflare-mcp.mattzcarey.workers.dev/mcp \
-  --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN"
-```
-
-</details>
-
-#### OpenCode
-
-<details>
-<summary>opencode.json</summary>
-
-Set your API token as an environment variable:
-
-```bash
-export CLOUDFLARE_API_TOKEN="your-token-here"
-```
-
-Then add to your `opencode.json`:
-
-```json
-{
-  "mcp": {
-    "cloudflare-api": {
-      "type": "remote",
-      "url": "https://cloudflare-mcp.mattzcarey.workers.dev/mcp",
-      "headers": {
-        "Authorization": "Bearer {env:CLOUDFLARE_API_TOKEN}"
-      }
-    }
-  }
-}
-```
-
-</details>
 
 ## The Problem
 
